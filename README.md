@@ -1,13 +1,46 @@
 # capcut-kit
 
-Ask Claude about your CapCut projects, and let it edit them.
+Point it at a folder of raw footage. Get back a CapCut project that is already worth opening.
 
-CapCut desktop has no API and no plugin system. But every project it saves is plain JSON on
-disk. This toolkit reads that JSON, checks it for damage, and writes new timelines back into
-it safely. You drive it by talking to Claude Code, or by running the CLI yourself.
+## The problem it solves
 
-**Status: early.** Reading, diagnosing, and backing up projects work today. Generating drafts
-from raw footage and cutting by silence, audio events, or beats are next.
+You filmed one thing from two angles. A camera on the work, a camera on your face. Now you
+have forty files and an empty timeline, and before any real editing starts you have to:
+
+1. Work out which clip from camera B happened during which clip from camera A.
+2. Drag them into place so the same moment lines up vertically.
+3. Scrub through the dead air, the setup, the silence, and cut it all out.
+
+That is an hour of mechanical work before you make a single creative decision. This does it
+for you.
+
+```bash
+capcut build ~/Footage/saturday --layout sync --cut-silence
+```
+
+**Every camera lands on its own track, at the real moment it was recorded**, read from the
+timestamp your camera wrote into the file. The same instant lines up vertically, so picking an
+angle is a click instead of a hunt.
+
+**Then the silence goes.** It listens for speech across every camera, keeps the parts where
+someone is talking, and closes the gaps. All tracks shift together, so cutting never breaks
+the alignment it just built.
+
+What you open in CapCut is a draft with the structure already right. You do the editing.
+
+## Why not just do it by hand
+
+- **CapCut cannot line up two cameras by recording time.** There is no command for it. By hand
+  it is a lot of dragging and squinting at timecode.
+- **It is repeatable.** Same footage in, same timeline out, every episode of a series.
+- **Nothing is re-encoded.** The project points at your original files where they already sit.
+- **You keep editing in CapCut.** This is not a replacement editor. It does the boring part and
+  hands you a normal project, with your usual effects, text, and templates.
+- **It reads projects too.** When CapCut says offline media and nothing else, `doctor` names the
+  file and the reason.
+
+**Status: early but real.** Building, aligning, silence cutting, inspecting, diagnosing, and
+backups all work today. Audio-event detection, subtitles, and beat syncing are next.
 
 ---
 
@@ -93,6 +126,7 @@ First run takes a few seconds while it builds its environment. After that it is 
 ```bash
 capcut projects                    # list your CapCut projects, newest first
 capcut build <folder>              # turn a folder of footage into a project
+capcut setup --analysis            # install what silence cutting needs
 capcut inspect <project>           # tracks, roles, gaps, pacing
 capcut inspect <project> --media   # which files are used, and for how long
 capcut inspect <project> --timeline  # every clip on the track, in order
@@ -109,16 +143,32 @@ both work. If a fragment matches more than one project, it lists them and stops.
 ### Building a project from footage
 
 ```bash
-capcut build ~/Footage/saturday-shoot
-capcut build ~/Footage/shoot --name "Saturday cut" --order time
-capcut build ~/Footage/shoot --per-camera --trim-start 2 --max-clip 10
+capcut build ~/Footage/shoot                                  everything end to end
+capcut build ~/Footage/shoot --layout sync                    cameras stacked and aligned
+capcut build ~/Footage/shoot --layout sync --cut-silence      aligned, dead air removed
+capcut build ~/Footage/shoot --name "Saturday cut"
+capcut build ~/Footage/shoot --trim-start 2 --max-clip 10
 ```
 
-Clips go on the timeline in recording order, read from each file's creation time, falling back
-to filename order when that is missing. `--per-camera` puts each recording device on its own
-track, which is what you want for a two-camera shoot. `--trim-start` and `--trim-end` cut the
-same number of seconds off every clip, for shaving the reach-for-the-record-button moments.
-`--max-clip` caps each clip's length.
+**`--layout sequence`** is the default. Every clip goes on one track, one after another, in
+recording order.
+
+**`--layout sync`** is the interesting one. Each camera gets its own track, and every clip sits
+at the moment it was actually recorded. A clip filmed twenty minutes in starts twenty minutes
+in. Two cameras rolling at once end up stacked, so the same moment is one vertical line. This
+needs a recording time in every file, which phones and real cameras write automatically. If any
+file is missing one, it says so and tells you to use `sequence` instead.
+
+**`--cut-silence`** listens for speech across every camera, keeps the stretches where someone
+is talking, and closes the gaps. Every track shifts by the same amount, so the alignment
+survives. Tune it with `--pad` for how much air to leave around each phrase, `--merge-gap` for
+how long a pause has to be before it becomes a cut, and `--min-window` to drop anything shorter
+than you care about.
+
+Silence cutting needs the audio extras, installed once with `capcut setup --analysis`.
+
+`--trim-start` and `--trim-end` cut the same number of seconds off every clip, for shaving the
+reach-for-the-record-button moments. `--max-clip` caps each clip's length.
 
 The canvas size is taken from whatever size most of your footage is, so vertical footage gives
 you a vertical project. Nothing is copied or re-encoded. The project points at your files
@@ -188,8 +238,9 @@ before doing it.
 - [x] Diagnose damage and broken links
 - [x] Snapshot and roll back
 - [x] Build a project from a folder of footage
-- [ ] Cut by silence, for talking-head and podcast footage
-- [ ] Sync two or more cameras by their audio
+- [x] Stack every camera at the moment it was recorded
+- [x] Cut the stretches where nobody is talking
+- [ ] Refine camera alignment by cross-correlating audio, for clocks that drift
 - [ ] Detect audio events, with recipes for LEGO clicks, keyboards, cooking, impacts
 - [ ] Import subtitles into a real text track
 - [ ] Cut a montage to music beats

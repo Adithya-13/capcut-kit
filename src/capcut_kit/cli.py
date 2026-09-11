@@ -3,7 +3,10 @@ import json
 import sys
 from pathlib import Path
 
-from . import __version__, assemble, format as fmt, inspect as inspect_mod, paths, safety
+from . import (
+    __version__, assemble, format as fmt, inspect as inspect_mod, paths, safety,
+    setup_extras, timeline,
+)
 from .draft import builder, model
 from .draft import validate as checks
 
@@ -123,20 +126,38 @@ def cmd_build(args: argparse.Namespace) -> int:
         return 2
     sources = assemble.order(assemble.gather(folder), args.order)
     name = args.name or folder.name
-    if args.per_camera:
+    if args.layout == assemble.LAYOUT_SYNC:
+        clips = assemble.align(sources)
         groups = assemble.group_by_device(sources)
-        clips = [
-            clip
-            for track, device in enumerate(sorted(groups))
-            for clip in assemble.to_clips(
-                assemble.order(groups[device], args.order), track=track,
-                trim_start_s=args.trim_start, trim_end_s=args.trim_end,
-                max_clip_s=args.max_clip)
-        ]
+        order = assemble.device_track_order(groups)
+        print(f"aligned {len(order)} camera(s) on a shared timeline: "
+              f"{', '.join(f'{d} ({len(groups[d])} clips)' for d in order)}")
+        span, gap = assemble.coverage(clips)
+        print(f"  spans {fmt.duration(int(span * 1_000_000))}, "
+              f"{fmt.duration(int(gap * 1_000_000))} of it with nothing on the main track")
     else:
         clips = assemble.to_clips(
             sources, trim_start_s=args.trim_start, trim_end_s=args.trim_end,
             max_clip_s=args.max_clip)
+    if args.cut_silence:
+        from .analysis import activity
+
+        print("listening for speech (first run downloads a small model)...")
+        windows = activity.windows_from(
+            timeline.placements(clips), pad_s=args.pad,
+            merge_gap_s=args.merge_gap, min_window_s=args.min_window)
+        before = timeline.total_span_s(clips)
+        clips = timeline.restrict(clips, windows)
+        after = timeline.total_span_s(clips)
+        saved = before - after
+        print(f"kept {len(windows)} talking windows: "
+              f"{fmt.duration(int(after * 1_000_000))} of "
+              f"{fmt.duration(int(before * 1_000_000))}, "
+              f"cut {fmt.duration(int(saved * 1_000_000))} of dead air")
+        if not clips:
+            print("error: no speech found, so nothing would be left", file=sys.stderr)
+            return 2
+
     result = builder.build(name, clips, paths.draft_root(), fps=args.fps,
                            overwrite=args.overwrite)
     print(f"built '{result.name}': {result.clip_count} clips, "
@@ -148,6 +169,19 @@ def cmd_build(args: argparse.Namespace) -> int:
     if safety.capcut_running():
         print("  CapCut is running. Restart it for the new project to appear.")
     return 0
+
+
+def cmd_setup(args: argparse.Namespace) -> int:
+    if not args.analysis:
+        ready = setup_extras.analysis_ready()
+        print(f"audio analysis extras: {'installed' if ready else 'not installed'}")
+        if not ready:
+            print("install them with: capcut setup --analysis")
+        return 0
+    if setup_extras.analysis_ready() and not args.force:
+        print("audio analysis extras are already installed")
+        return 0
+    return setup_extras.install(setup_extras.ANALYSIS_EXTRA)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -167,16 +201,34 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_inspect)
 
+    p = sub.add_parser("setup", help="check or install optional extras")
+    p.add_argument("--analysis", action="store_true",
+                   help="install what silence cutting needs")
+    p.add_argument("--force", action="store_true", help="reinstall even if present")
+    p.set_defaults(func=cmd_setup)
+
     p = sub.add_parser("build", help="create a project from a folder of footage")
     p.add_argument("folder")
     p.add_argument("--name", default=None, help="project name, defaults to the folder name")
     p.add_argument("--order", choices=[assemble.ORDER_TIME, assemble.ORDER_NAME],
                    default=assemble.ORDER_TIME, help="clip order on the timeline")
-    p.add_argument("--per-camera", action="store_true",
-                   help="put each recording device on its own track")
+    p.add_argument("--layout", choices=[assemble.LAYOUT_SEQUENCE, assemble.LAYOUT_SYNC],
+                   default=assemble.LAYOUT_SEQUENCE,
+                   help="sequence: every clip end to end. "
+                        "sync: each camera on its own track, every clip at the real moment "
+                        "it was recorded, so the same moment lines up vertically")
     p.add_argument("--trim-start", type=float, default=0.0, help="seconds to cut off each head")
     p.add_argument("--trim-end", type=float, default=0.0, help="seconds to cut off each tail")
     p.add_argument("--max-clip", type=float, default=None, help="cap each clip at N seconds")
+    p.add_argument("--cut-silence", action="store_true",
+                   help="drop stretches where nobody is talking, closing the gaps and "
+                        "keeping every camera in sync")
+    p.add_argument("--pad", type=float, default=0.25,
+                   help="seconds of air kept around each talking stretch")
+    p.add_argument("--merge-gap", type=float, default=0.6,
+                   help="pauses shorter than this stay in, rather than becoming a cut")
+    p.add_argument("--min-window", type=float, default=0.0,
+                   help="drop kept stretches shorter than this")
     p.add_argument("--fps", type=float, default=30.0)
     p.add_argument("--overwrite", action="store_true", help="replace an existing project")
     p.set_defaults(func=cmd_build)
