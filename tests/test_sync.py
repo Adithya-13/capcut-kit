@@ -1,7 +1,8 @@
 from pathlib import Path
 
-import numpy as np
 import pytest
+
+np = pytest.importorskip("numpy", reason="needs the audio analysis extras")
 
 from capcut_kit.analysis import sync
 

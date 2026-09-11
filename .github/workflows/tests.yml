@@ -6,7 +6,8 @@ on:
   pull_request:
 
 jobs:
-  test:
+  core:
+    name: core (no extras)
     runs-on: macos-latest
     strategy:
       matrix:
@@ -17,4 +18,18 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
-      - run: pytest tests -q
+      - name: run the tests that need no extras
+        run: pytest tests -q
+
+  analysis:
+    name: with audio extras
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: brew install ffmpeg
+      - run: pip install -e ".[analysis,dev]"
+      - name: run every test
+        run: pytest tests -q
