@@ -1,5 +1,7 @@
 # capcut-kit
 
+[![tests](https://github.com/Adithya-13/capcut-kit/actions/workflows/tests.yml/badge.svg)](https://github.com/Adithya-13/capcut-kit/actions/workflows/tests.yml)
+
 Point it at a folder of raw footage. Get back a CapCut project that is already worth opening.
 
 ## The problem it solves
@@ -165,7 +167,14 @@ survives. Tune it with `--pad` for how much air to leave around each phrase, `--
 how long a pause has to be before it becomes a cut, and `--min-window` to drop anything shorter
 than you care about.
 
-Silence cutting needs the audio extras, installed once with `capcut setup --analysis`.
+Silence cutting needs the audio extras, installed once with `capcut setup --analysis`. They are
+a few hundred megabytes, because speech detection pulls in PyTorch. Everything else works
+without them. `capcut setup --clear-cache` throws away the audio it extracted along the way.
+
+`--layout sync` refuses `--trim-start`, `--trim-end`, `--max-clip`, and `--order`, because those
+contradict placing clips at their real recording time. If two clips from one camera overlap,
+usually a duplicate or a re-exported copy, that camera gets a second track and the command says
+so rather than writing a broken timeline.
 
 `--trim-start` and `--trim-end` cut the same number of seconds off every clip, for shaving the
 reach-for-the-record-button moments. `--max-clip` caps each clip's length.

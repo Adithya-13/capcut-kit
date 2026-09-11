@@ -88,8 +88,3 @@ def probe(path: Path) -> MediaInfo:
 
 def probe_many(paths: list[Path]) -> dict[Path, MediaInfo]:
     return {p: probe(p) for p in paths}
-
-
-def media_files(folder: Path, suffixes: set[str] | None = None) -> list[Path]:
-    allowed = suffixes or (VIDEO_SUFFIXES | AUDIO_SUFFIXES)
-    return sorted(p for p in folder.iterdir() if p.suffix.lower() in allowed)

@@ -14,10 +14,6 @@ class Window:
         return self.end_s - self.start_s
 
 
-def _overlaps(window: Window, start: float, end: float) -> bool:
-    return window.start_s < end and start < window.end_s
-
-
 def windows_from(placements: list[tuple[Path, float]], *, pad_s: float = 0.25,
                  merge_gap_s: float = 0.6,
                  min_window_s: float = 0.0) -> list[Window]:
@@ -30,7 +26,3 @@ def windows_from(placements: list[tuple[Path, float]], *, pad_s: float = 0.25,
     if min_window_s > 0:
         windows = [w for w in windows if w.duration_s >= min_window_s]
     return windows
-
-
-def kept_seconds(windows: list[Window]) -> float:
-    return sum(w.duration_s for w in windows)

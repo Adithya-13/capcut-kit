@@ -46,7 +46,3 @@ def detect(source: Path, *, pad_s: float = DEFAULT_PAD_S,
         for seg in raw
     ]
     return merge(padded, merge_gap_s)
-
-
-def spoken_seconds(intervals: list[tuple[float, float]]) -> float:
-    return sum(end - start for start, end in intervals)

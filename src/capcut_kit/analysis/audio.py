@@ -16,7 +16,9 @@ class AnalysisUnavailable(RuntimeError):
 def require_analysis_extras() -> None:
     try:
         import numpy  # noqa: F401
+        import silero_vad  # noqa: F401
         import soundfile  # noqa: F401
+        import torch  # noqa: F401
     except ImportError as exc:
         raise AnalysisUnavailable(
             "this needs the audio analysis extras. Install them with:\n"

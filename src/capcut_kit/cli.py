@@ -127,10 +127,23 @@ def cmd_build(args: argparse.Namespace) -> int:
     sources = assemble.order(assemble.gather(folder), args.order)
     name = args.name or folder.name
     if args.layout == assemble.LAYOUT_SYNC:
-        clips = assemble.align(sources)
+        ignored = [
+            flag for flag, value in (
+                ("--trim-start", args.trim_start), ("--trim-end", args.trim_end),
+                ("--max-clip", args.max_clip), ("--order", args.order != assemble.ORDER_TIME),
+            ) if value
+        ]
+        if ignored:
+            print(f"error: {', '.join(ignored)} cannot be used with --layout sync, which "
+                  f"places every clip at its real recording time.", file=sys.stderr)
+            return 2
+        clips, notes = assemble.align(sources)
+        for note in notes:
+            print(f"note: {note}")
         groups = assemble.group_by_device(sources)
         order = assemble.device_track_order(groups)
-        print(f"aligned {len(order)} camera(s) on a shared timeline: "
+        tracks = len({c.track for c in clips})
+        print(f"aligned {len(order)} camera(s) on {tracks} track(s): "
               f"{', '.join(f'{d} ({len(groups[d])} clips)' for d in order)}")
         span, gap = assemble.coverage(clips)
         print(f"  spans {fmt.duration(int(span * 1_000_000))}, "
@@ -172,6 +185,11 @@ def cmd_build(args: argparse.Namespace) -> int:
 
 
 def cmd_setup(args: argparse.Namespace) -> int:
+    if args.clear_cache:
+        from .analysis import audio
+
+        print(f"removed {audio.clear_cache()} cached audio files")
+        return 0
     if not args.analysis:
         ready = setup_extras.analysis_ready()
         print(f"audio analysis extras: {'installed' if ready else 'not installed'}")
@@ -205,6 +223,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--analysis", action="store_true",
                    help="install what silence cutting needs")
     p.add_argument("--force", action="store_true", help="reinstall even if present")
+    p.add_argument("--clear-cache", action="store_true",
+                   help="delete the extracted audio kept for silence detection")
     p.set_defaults(func=cmd_setup)
 
     p = sub.add_parser("build", help="create a project from a folder of footage")

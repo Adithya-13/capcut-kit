@@ -54,7 +54,24 @@ class NoTimestamps(ValueError):
     pass
 
 
-def align(sources: list[Source]) -> list[Clip]:
+def lanes_for(sources: list[Source]) -> list[list[Source]]:
+    lanes: list[list[Source]] = []
+    lane_ends: list[float] = []
+    for source in sorted(sources, key=lambda s: s.info.created):
+        start = source.info.created.timestamp()
+        end = start + source.info.duration_s
+        for index, lane_end in enumerate(lane_ends):
+            if lane_end <= start:
+                lanes[index].append(source)
+                lane_ends[index] = end
+                break
+        else:
+            lanes.append([source])
+            lane_ends.append(end)
+    return lanes
+
+
+def align(sources: list[Source]) -> tuple[list[Clip], list[str]]:
     undated = [s.path.name for s in sources if s.info.created is None]
     if undated:
         raise NoTimestamps(
@@ -63,14 +80,24 @@ def align(sources: list[Source]) -> list[Clip]:
         )
     groups = group_by_device(sources)
     origin = min(s.info.created for s in sources)
-    clips = []
-    for track, device in enumerate(device_track_order(groups)):
-        for source in sorted(groups[device], key=lambda s: s.info.created):
-            offset = (source.info.created - origin).total_seconds()
-            clips.append(Clip(path=source.path, source_start_s=0.0,
-                              duration_s=source.info.duration_s,
-                              target_start_s=offset, track=track))
-    return clips
+    clips: list[Clip] = []
+    notes: list[str] = []
+    track = 0
+    for device in device_track_order(groups):
+        lanes = lanes_for(groups[device])
+        if len(lanes) > 1:
+            notes.append(
+                f"{device} has clips that overlap in time, so it needed "
+                f"{len(lanes)} tracks. Duplicate or re-exported files are the usual cause."
+            )
+        for lane in lanes:
+            for source in lane:
+                offset = (source.info.created - origin).total_seconds()
+                clips.append(Clip(path=source.path, source_start_s=0.0,
+                                  duration_s=source.info.duration_s,
+                                  target_start_s=offset, track=track))
+            track += 1
+    return clips, notes
 
 
 def coverage(clips: list[Clip]) -> tuple[float, float]:
@@ -90,11 +117,13 @@ def to_clips(sources: list[Source], *, trim_start_s: float = 0.0,
              trim_end_s: float = 0.0, max_clip_s: float | None = None,
              track: int = 0) -> list[Clip]:
     clips = []
+    cursor = 0.0
     for source in sources:
         available = source.info.duration_s - trim_start_s - trim_end_s
         if available <= 0:
             continue
         duration = min(available, max_clip_s) if max_clip_s else available
         clips.append(Clip(path=source.path, source_start_s=trim_start_s,
-                          duration_s=duration, track=track))
+                          duration_s=duration, target_start_s=cursor, track=track))
+        cursor += duration
     return clips
