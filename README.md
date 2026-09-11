@@ -54,9 +54,10 @@ way: you open CapCut and press export yourself. If you wanted unattended renderi
 **macOS only.** It quits and reopens CapCut using macOS commands, and looks for your projects
 in `~/Movies/CapCut`. There is no Windows support and none planned.
 
-**One CapCut version is verified.** CapCut 179.x, draft format version 360000. Other versions
-can still be read. Writing to them is refused unless you pass `--force`, because a format
-change could corrupt a project.
+**One CapCut version is verified.** CapCut 179.x, draft format version 360000. Projects are
+written in that format, and `doctor` warns when it meets a project saved by a different one.
+Nothing here rewrites an existing project's timeline yet, so a format mismatch cannot damage
+your work today. When in-place editing lands, it will refuse unfamiliar formats.
 
 ---
 
@@ -213,7 +214,7 @@ Errors mean something is actually broken. Warnings are cosmetic.
 | `overlap` | two clips occupy the same moment on one track | restore from a backup |
 | `source-out-of-range` | a clip reads past the end of its own source file | restore from a backup |
 | `duration-drift` | stored length disagrees with the timeline | harmless, fixed on the next write |
-| `untested-format` | your CapCut version is not the verified one | reading is fine, writing needs `--force` |
+| `untested-format` | your CapCut version is not the verified one | reading is fine; treat anything this tool generates for that version as unproven |
 
 CapCut's own cache files and its internal `##_draftpath_placeholder_` paths are resolved
 automatically, so they are never reported as missing.
