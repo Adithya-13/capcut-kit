@@ -8,6 +8,7 @@ from . import template
 from .template import US
 
 MIN_CLIP_US = 1000
+ROUNDING_SLACK_US = 1000
 
 
 @dataclass(frozen=True)
@@ -46,12 +47,12 @@ def _canvas_size(infos: list[MediaInfo]) -> tuple[int, int]:
 
 
 def _clip_ranges(clip: Clip, info: MediaInfo) -> tuple[int, int] | None:
-    source_start = int(clip.source_start_s * US)
+    source_start = round(clip.source_start_s * US)
     if source_start >= info.duration_us:
         return None
     requested = info.duration_us - source_start
     if clip.duration_s is not None:
-        requested = min(requested, int(clip.duration_s * US))
+        requested = min(requested, round(clip.duration_s * US))
     if requested < MIN_CLIP_US:
         return None
     return source_start, requested
@@ -89,7 +90,11 @@ def build(name: str, clips: list[Clip], root: Path, *, fps: float = 30.0,
                 skipped.append(clip.path.name)
                 continue
             source_start, duration = ranges
-            target_start = cursor if clip.target_start_s is None else int(clip.target_start_s * US)
+            target_start = (cursor if clip.target_start_s is None
+                            else round(clip.target_start_s * US))
+            behind = cursor - target_start
+            if 0 < behind <= ROUNDING_SLACK_US:
+                target_start = cursor
             material = template.video_material(
                 str(clip.path), clip.path.name, info.duration_us,
                 info.width, info.height, info.has_audio,

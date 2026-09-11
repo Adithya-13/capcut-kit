@@ -1,0 +1,15 @@
+name = "lego"
+description = "The click of a LEGO brick seating into another. Short, bright, and sharp, with silence either side."
+
+band_low_hz = 3000
+band_high_hz = 14000
+
+min_prominence_db = 15.0
+min_isolation_db = 12.0
+min_decay_db = 11.0
+max_width_ms = 70.0
+
+min_gap_s = 0.5
+lead_s = 0.04
+clip_s = 0.133
+exclude_speech = true

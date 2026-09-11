@@ -41,8 +41,9 @@ What you open in CapCut is a draft with the structure already right. You do the 
 - **It reads projects too.** When CapCut says offline media and nothing else, `doctor` names the
   file and the reason.
 
-**Status: early but real.** Building, aligning, silence cutting, inspecting, diagnosing, and
-backups all work today. Audio-event detection, subtitles, and beat syncing are next.
+**Status: early but real.** Building, aligning cameras by audio, silence cutting, sound
+detection and montages, inspecting, diagnosing, and backups all work today. Subtitles and beat
+syncing are next.
 
 ---
 
@@ -129,7 +130,10 @@ First run takes a few seconds while it builds its environment. After that it is 
 ```bash
 capcut projects                    # list your CapCut projects, newest first
 capcut build <folder>              # turn a folder of footage into a project
-capcut setup --analysis            # install what silence cutting needs
+capcut recipes                     # list the sound recipes you can detect with
+capcut events <folder>             # count a kind of sound in footage
+capcut montage <folder>            # cut every occurrence into one project
+capcut setup --analysis            # install what silence and sound detection need
 capcut inspect <project>           # tracks, roles, gaps, pacing
 capcut inspect <project> --media   # which files are used, and for how long
 capcut inspect <project> --timeline  # every clip on the track, in order
@@ -192,6 +196,25 @@ you a vertical project. Nothing is copied or re-encoded. The project points at y
 where they already live, so leave them there.
 
 If CapCut is open when you build, restart it for the new project to appear.
+
+### Finding sounds and cutting montages
+
+```bash
+capcut events ~/Footage/build --recipe lego --list
+capcut montage ~/Footage/build --recipe lego --target-length 90
+```
+
+Detection is driven by recipes, which are plain TOML files describing what a sound looks like:
+which frequency band it lives in, how far it has to stand above the room, how quickly it decays,
+how narrow it is. Three ship with the tool, for LEGO brick clicks, keyboard presses, and impacts.
+Write your own by dropping a `.toml` into `~/.capcut-kit/recipes/`. Adding a new kind of sound
+never means writing code.
+
+Run `events` first. It is read-only, creates no project, and tells you whether the recipe suits
+the footage before you build anything. `--target-length` samples evenly across the whole
+recording, so a montage of a three hour build is not drawn entirely from its first two minutes.
+
+It finds sounds, not good moments. It cannot tell a satisfying click from an accidental one.
 
 ### What inspect tells you
 
@@ -258,7 +281,7 @@ before doing it.
 - [x] Stack every camera at the moment it was recorded
 - [x] Cut the stretches where nobody is talking
 - [x] Refine camera alignment by cross-correlating audio, for clocks that drift
-- [ ] Detect audio events, with recipes for LEGO clicks, keyboards, cooking, impacts
+- [x] Detect audio events, with recipes for LEGO clicks, keyboards, and impacts
 - [ ] Import subtitles into a real text track
 - [ ] Cut a montage to music beats
 

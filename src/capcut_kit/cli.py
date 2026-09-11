@@ -7,6 +7,7 @@ from . import (
     __version__, assemble, format as fmt, inspect as inspect_mod, paths, safety,
     setup_extras, timeline,
 )
+from . import recipes as recipe_store
 from .draft import builder, model
 from .draft import validate as checks
 
@@ -213,6 +214,96 @@ def cmd_setup(args: argparse.Namespace) -> int:
     return setup_extras.install(setup_extras.ANALYSIS_EXTRA)
 
 
+def _sources_for(target: str) -> list:
+    path = Path(target).expanduser()
+    if path.is_file():
+        from .media.probe import probe
+
+        return [assemble.Source(path=path, info=probe(path))]
+    if not path.is_dir():
+        raise FileNotFoundError(f"not a file or folder: {path}")
+    return assemble.gather(path)
+
+
+def _detect_events(sources: list, profile, quiet: bool = False) -> list[tuple[float, object]]:
+    from .analysis import events as event_detect
+    from .analysis import speech as speech_detect
+
+    offsets = (assemble.clock_offsets(sources)
+               if all(s.info.created for s in sources)
+               else {s.path: 0.0 for s in sources})
+    found: list[tuple[float, object]] = []
+    for source in sources:
+        spoken = speech_detect.detect(source.path) if profile.exclude_speech else []
+        hits = event_detect.detect(source.path, profile, spoken)
+        if not quiet:
+            print(f"  {source.path.name}: {len(hits)}")
+        found.extend((offsets[source.path] + hit.at_s, hit) for hit in hits)
+    found.sort(key=lambda pair: pair[0])
+    return found
+
+
+def cmd_recipes(args: argparse.Namespace) -> int:
+    rows = []
+    for name, path in sorted(recipe_store.available().items()):
+        profile = recipe_store.load(name)
+        origin = "yours" if path.parent == recipe_store.USER_DIR else "built in"
+        rows.append([name, origin, profile.description or ""])
+    print(fmt.table(rows, ["recipe", "source", "what it listens for"]))
+    print(f"\nadd your own as .toml files in {recipe_store.USER_DIR}")
+    return 0
+
+
+def cmd_events(args: argparse.Namespace) -> int:
+    profile = recipe_store.load(args.recipe)
+    sources = _sources_for(args.target)
+    print(f"listening for '{profile.name}' across {len(sources)} file(s)...")
+    found = _detect_events(sources, profile)
+    if not found:
+        print("no matching sounds found. Loosen the recipe, or try another one.")
+        return 1
+    print(f"\n{len(found)} events")
+    if args.list:
+        rows = [
+            [f"{at:.2f}", hit.source.name, f"{hit.prominence_db:.0f}",
+             f"{hit.isolation_db:.0f}", f"{hit.width_ms:.0f}"]
+            for at, hit in found[: args.limit]
+        ]
+        print(fmt.table(rows, ["at", "file", "loud", "isolated", "width ms"]))
+    return 0
+
+
+def cmd_montage(args: argparse.Namespace) -> int:
+    profile = recipe_store.load(args.recipe)
+    sources = _sources_for(args.target)
+    name = args.name or f"{Path(args.target).name} {profile.name}"
+    print(f"listening for '{profile.name}' across {len(sources)} file(s)...")
+    found = _detect_events(sources, profile)
+    if not found:
+        print("no matching sounds found, so there is nothing to cut together",
+              file=sys.stderr)
+        return 1
+    wanted = int(args.target_length / profile.clip_s) if args.target_length else len(found)
+    from .analysis.events import stride_sample
+
+    chosen = stride_sample(found, wanted)
+    clips = []
+    cursor = 0.0
+    for _, hit in chosen:
+        clips.append(builder.Clip(
+            path=hit.source, source_start_s=max(0.0, hit.at_s - profile.lead_s),
+            duration_s=profile.clip_s, target_start_s=cursor))
+        cursor += profile.clip_s
+    result = builder.build(name, clips, paths.draft_root(), fps=args.fps,
+                           overwrite=args.overwrite)
+    print(f"\nbuilt '{result.name}': {result.clip_count} of {len(found)} events, "
+          f"{fmt.duration(result.duration_us)}")
+    print(f"  {result.dir}")
+    if safety.capcut_running():
+        print("  CapCut is running. Restart it for the new project to appear.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="capcut", description="CapCut project toolkit")
     parser.add_argument("--version", action="version", version=f"capcut-kit {__version__}")
@@ -270,6 +361,26 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--fps", type=float, default=30.0)
     p.add_argument("--overwrite", action="store_true", help="replace an existing project")
     p.set_defaults(func=cmd_build)
+
+    p = sub.add_parser("recipes", help="list the sound recipes you can detect with")
+    p.set_defaults(func=cmd_recipes)
+
+    p = sub.add_parser("events", help="find a kind of sound in footage, without building")
+    p.add_argument("target", help="a video file or a folder of them")
+    p.add_argument("--recipe", default="lego")
+    p.add_argument("--list", action="store_true", help="print every detection")
+    p.add_argument("--limit", type=int, default=40)
+    p.set_defaults(func=cmd_events)
+
+    p = sub.add_parser("montage", help="cut every detected sound into one project")
+    p.add_argument("target", help="a video file or a folder of them")
+    p.add_argument("--recipe", default="lego")
+    p.add_argument("--name", default=None)
+    p.add_argument("--target-length", type=float, default=None,
+                   help="aim for this many seconds, sampled evenly across the build")
+    p.add_argument("--fps", type=float, default=30.0)
+    p.add_argument("--overwrite", action="store_true")
+    p.set_defaults(func=cmd_montage)
 
     p = sub.add_parser("doctor", help="check a project for problems")
     p.add_argument("project")

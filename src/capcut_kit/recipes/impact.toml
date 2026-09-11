@@ -1,0 +1,15 @@
+name = "impact"
+description = "Hits and strikes: a ball, a bat, a door, a dropped tool. Louder and wider than a click."
+
+band_low_hz = 500
+band_high_hz = 8000
+
+min_prominence_db = 18.0
+min_isolation_db = 12.0
+min_decay_db = 10.0
+max_width_ms = 250.0
+
+min_gap_s = 0.4
+lead_s = 0.15
+clip_s = 0.6
+exclude_speech = false
