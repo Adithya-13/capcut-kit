@@ -67,20 +67,27 @@ needs_setup() {
 if needs_setup; then
     echo "capcut-kit: setting up its environment in $VENV" >&2
     mkdir -p "$KIT_HOME"
+    UV=""
     if [ -x "$PYTHON" ]; then
-        :
+        UV=$(find_uv || true)
     elif UV=$(find_uv); then
         "$UV" venv --python 3.12 "$VENV" >&2
     elif BASE=$(find_python); then
         "$BASE" -m venv "$VENV" >&2
     elif [ "${CAPCUT_KIT_AUTO_INSTALL:-0}" = "1" ] || offer_uv_install "$@"; then
         install_uv
-        "$UV_LOCAL" venv --python 3.12 "$VENV" >&2
+        UV="$UV_LOCAL"
+        "$UV" venv --python 3.12 "$VENV" >&2
     else
         exit 1
     fi
-    "$PYTHON" -m pip install --quiet --upgrade pip >&2
-    "$PYTHON" -m pip install --quiet -e "$ROOT" >&2
+
+    if [ -n "$UV" ] && [ -x "$UV" ] || [ -n "$UV" ] && command -v "$UV" >/dev/null 2>&1; then
+        "$UV" pip install --quiet --python "$PYTHON" -e "$ROOT" >&2
+    else
+        "$PYTHON" -m pip install --quiet --upgrade pip >&2
+        "$PYTHON" -m pip install --quiet -e "$ROOT" >&2
+    fi
     echo "capcut-kit: ready" >&2
 fi
 
