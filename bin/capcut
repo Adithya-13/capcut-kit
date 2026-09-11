@@ -8,9 +8,9 @@ PYTHON="$VENV/bin/python"
 UV_LOCAL="$KIT_HOME/bin/uv"
 
 find_python() {
-    for candidate in python3.13 python3.12 python3.11 python3.10 python3; do
+    for candidate in python3.13 python3.12 python3.11 python3; do
         if command -v "$candidate" >/dev/null 2>&1 &&
-           "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
+           "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
             echo "$candidate"
             return 0
         fi
@@ -31,7 +31,7 @@ find_uv() {
 }
 
 offer_uv_install() {
-    echo "capcut-kit needs Python 3.10 or newer, and this Mac does not have one." >&2
+    echo "capcut-kit needs Python 3.11 or newer, and this Mac does not have one." >&2
     echo "" >&2
     echo "It can install uv (a Python manager) into $KIT_HOME/bin," >&2
     echo "which brings its own Python. Nothing outside $KIT_HOME is touched," >&2

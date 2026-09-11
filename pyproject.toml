@@ -3,7 +3,7 @@ name = "capcut-kit"
 version = "0.1.0"
 description = "Read, edit, and generate CapCut desktop projects from the command line"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 
 [project.optional-dependencies]

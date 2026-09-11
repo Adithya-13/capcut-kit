@@ -81,11 +81,11 @@ on your machine. Those three things are the entire job here. Use Claude Code.
 |---|---|---|
 | macOS | CapCut desktop and its control commands | already there |
 | CapCut desktop | the projects themselves | capcut.com |
-| Python 3.10+ | runs the toolkit | handled for you, see below |
+| Python 3.11+ | runs the toolkit | handled for you, see below |
 | ffmpeg | reading video length, size, and audio | `brew install ffmpeg` |
 
 You do not need to set up Python yourself. On first run the toolkit builds its own isolated
-environment in `~/.capcut-kit`. If your Mac has no Python 3.10 or newer, it offers to install
+environment in `~/.capcut-kit`. If your Mac has no Python 3.11 or newer, it offers to install
 [uv](https://github.com/astral-sh/uv) inside that same folder and nowhere else. It asks first.
 Deleting `~/.capcut-kit` removes everything it ever created.
 
