@@ -3,8 +3,8 @@ import json
 import sys
 from pathlib import Path
 
-from . import __version__, format as fmt, inspect as inspect_mod, paths, safety
-from .draft import model
+from . import __version__, assemble, format as fmt, inspect as inspect_mod, paths, safety
+from .draft import builder, model
 from .draft import validate as checks
 
 
@@ -116,6 +116,40 @@ def cmd_restore(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_build(args: argparse.Namespace) -> int:
+    folder = Path(args.folder).expanduser()
+    if not folder.is_dir():
+        print(f"error: not a folder: {folder}", file=sys.stderr)
+        return 2
+    sources = assemble.order(assemble.gather(folder), args.order)
+    name = args.name or folder.name
+    if args.per_camera:
+        groups = assemble.group_by_device(sources)
+        clips = [
+            clip
+            for track, device in enumerate(sorted(groups))
+            for clip in assemble.to_clips(
+                assemble.order(groups[device], args.order), track=track,
+                trim_start_s=args.trim_start, trim_end_s=args.trim_end,
+                max_clip_s=args.max_clip)
+        ]
+    else:
+        clips = assemble.to_clips(
+            sources, trim_start_s=args.trim_start, trim_end_s=args.trim_end,
+            max_clip_s=args.max_clip)
+    result = builder.build(name, clips, paths.draft_root(), fps=args.fps,
+                           overwrite=args.overwrite)
+    print(f"built '{result.name}': {result.clip_count} clips, "
+          f"{fmt.duration(result.duration_us)}, {result.tracks} track(s)")
+    print(f"  {result.dir}")
+    if result.skipped:
+        print(f"  skipped {len(result.skipped)} unusable files: "
+              f"{', '.join(result.skipped[:5])}")
+    if safety.capcut_running():
+        print("  CapCut is running. Restart it for the new project to appear.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="capcut", description="CapCut project toolkit")
     parser.add_argument("--version", action="version", version=f"capcut-kit {__version__}")
@@ -132,6 +166,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--media", action="store_true", help="list media usage")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_inspect)
+
+    p = sub.add_parser("build", help="create a project from a folder of footage")
+    p.add_argument("folder")
+    p.add_argument("--name", default=None, help="project name, defaults to the folder name")
+    p.add_argument("--order", choices=[assemble.ORDER_TIME, assemble.ORDER_NAME],
+                   default=assemble.ORDER_TIME, help="clip order on the timeline")
+    p.add_argument("--per-camera", action="store_true",
+                   help="put each recording device on its own track")
+    p.add_argument("--trim-start", type=float, default=0.0, help="seconds to cut off each head")
+    p.add_argument("--trim-end", type=float, default=0.0, help="seconds to cut off each tail")
+    p.add_argument("--max-clip", type=float, default=None, help="cap each clip at N seconds")
+    p.add_argument("--fps", type=float, default=30.0)
+    p.add_argument("--overwrite", action="store_true", help="replace an existing project")
+    p.set_defaults(func=cmd_build)
 
     p = sub.add_parser("doctor", help="check a project for problems")
     p.add_argument("project")
@@ -160,7 +208,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
-    except (LookupError, FileNotFoundError, RuntimeError) as exc:
+    except (LookupError, FileNotFoundError, FileExistsError, ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

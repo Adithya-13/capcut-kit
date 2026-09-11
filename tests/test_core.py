@@ -125,3 +125,89 @@ def test_resolve_project_matches_fragment(tmp_path):
     assert paths.resolve_project("holiday", root).name == "Holiday Vlog"
     with pytest.raises(LookupError):
         paths.resolve_project("nope", root)
+
+
+def test_generated_draft_carries_no_machine_identifiers():
+    from capcut_kit.draft import template
+
+    info = template.new_draft_info("x", 1080, 1920)
+    for block in (info["platform"], info["last_modified_platform"]):
+        assert block["device_id"] == ""
+        assert block["hard_disk_id"] == ""
+        assert block["mac_address"] == ""
+        assert block["os_version"] == ""
+
+
+def test_every_segment_gets_private_extra_materials():
+    from capcut_kit.draft import template
+
+    refs = []
+    materials = {category: [] for category in template.MATERIAL_CATEGORIES}
+    for _ in range(2):
+        for category in template.EXTRA_CATEGORIES:
+            extra = template.EXTRA_BUILDERS[category]()
+            materials[category].append(extra)
+            refs.append(extra["id"])
+    assert len(refs) == len(set(refs)) == 12
+    for category in template.EXTRA_CATEGORIES:
+        assert len(materials[category]) == 2
+
+
+def test_build_writes_an_openable_project(tmp_path, monkeypatch):
+    from capcut_kit.draft import builder
+    from capcut_kit.media.probe import MediaInfo
+
+    root = tmp_path / "drafts"
+    root.mkdir()
+    clip_path = tmp_path / "a.mov"
+    clip_path.write_bytes(b"")
+    fake = MediaInfo(path=clip_path, width=1080, height=1920, duration_us=10 * US,
+                     has_video=True, has_audio=True, created=None, device="Phone")
+    monkeypatch.setattr(builder, "probe", lambda path: fake)
+
+    result = builder.build("demo", [builder.Clip(path=clip_path, duration_s=4.0)], root)
+    assert result.clip_count == 1
+    assert result.duration_us == 4 * US
+
+    draft = model.load(result.dir)
+    assert validate.check(draft) == []
+    assert draft.info["canvas_config"]["width"] == 1080
+    panel = model.media_entries(draft)
+    assert [entry["file_Path"] for entry in panel] == [str(clip_path)]
+
+
+def test_build_refuses_to_clobber_an_existing_project(tmp_path, monkeypatch):
+    from capcut_kit.draft import builder
+    from capcut_kit.media.probe import MediaInfo
+
+    root = tmp_path / "drafts"
+    (root / "demo").mkdir(parents=True)
+    clip_path = tmp_path / "a.mov"
+    clip_path.write_bytes(b"")
+    fake = MediaInfo(path=clip_path, width=1080, height=1920, duration_us=10 * US,
+                     has_video=True, has_audio=True, created=None, device=None)
+    monkeypatch.setattr(builder, "probe", lambda path: fake)
+    with pytest.raises(builder.ProjectExists):
+        builder.build("demo", [builder.Clip(path=clip_path)], root)
+
+
+def test_build_skips_clips_trimmed_out_of_existence(tmp_path, monkeypatch):
+    from capcut_kit.draft import builder
+    from capcut_kit.media.probe import MediaInfo
+
+    root = tmp_path / "drafts"
+    root.mkdir()
+    short = tmp_path / "short.mov"
+    good = tmp_path / "good.mov"
+    for path in (short, good):
+        path.write_bytes(b"")
+    sizes = {short: 1 * US, good: 10 * US}
+    monkeypatch.setattr(builder, "probe", lambda path: MediaInfo(
+        path=path, width=1080, height=1920, duration_us=sizes[path],
+        has_video=True, has_audio=True, created=None, device=None))
+
+    clips = [builder.Clip(path=short, source_start_s=5.0),
+             builder.Clip(path=good, duration_s=3.0)]
+    result = builder.build("demo", clips, root)
+    assert result.clip_count == 1
+    assert result.skipped == ["short.mov"]

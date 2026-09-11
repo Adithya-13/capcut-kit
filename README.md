@@ -92,6 +92,7 @@ First run takes a few seconds while it builds its environment. After that it is 
 
 ```bash
 capcut projects                    # list your CapCut projects, newest first
+capcut build <folder>              # turn a folder of footage into a project
 capcut inspect <project>           # tracks, roles, gaps, pacing
 capcut inspect <project> --media   # which files are used, and for how long
 capcut inspect <project> --timeline  # every clip on the track, in order
@@ -104,6 +105,26 @@ capcut restore <project> [stamp]   # roll back, defaults to the newest snapshot
 
 Project names match on fragments. `capcut inspect 0908` and `capcut inspect "auto Minecraft"`
 both work. If a fragment matches more than one project, it lists them and stops.
+
+### Building a project from footage
+
+```bash
+capcut build ~/Footage/saturday-shoot
+capcut build ~/Footage/shoot --name "Saturday cut" --order time
+capcut build ~/Footage/shoot --per-camera --trim-start 2 --max-clip 10
+```
+
+Clips go on the timeline in recording order, read from each file's creation time, falling back
+to filename order when that is missing. `--per-camera` puts each recording device on its own
+track, which is what you want for a two-camera shoot. `--trim-start` and `--trim-end` cut the
+same number of seconds off every clip, for shaving the reach-for-the-record-button moments.
+`--max-clip` caps each clip's length.
+
+The canvas size is taken from whatever size most of your footage is, so vertical footage gives
+you a vertical project. Nothing is copied or re-encoded. The project points at your files
+where they already live, so leave them there.
+
+If CapCut is open when you build, restart it for the new project to appear.
 
 ### What inspect tells you
 
@@ -166,7 +187,7 @@ before doing it.
 - [x] Read projects, report pacing and media usage
 - [x] Diagnose damage and broken links
 - [x] Snapshot and roll back
-- [ ] Build a draft from a folder of footage
+- [x] Build a project from a folder of footage
 - [ ] Cut by silence, for talking-head and podcast footage
 - [ ] Sync two or more cameras by their audio
 - [ ] Detect audio events, with recipes for LEGO clicks, keyboards, cooking, impacts
