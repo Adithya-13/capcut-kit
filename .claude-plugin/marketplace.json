@@ -1,0 +1,14 @@
+{
+  "name": "capcut-kit",
+  "owner": {
+    "name": "Adithya Firmansyah Putra"
+  },
+  "description": "CapCut desktop automation for Claude Code",
+  "plugins": [
+    {
+      "name": "capcut-kit",
+      "source": ".",
+      "description": "Read, edit, and generate CapCut desktop projects from Claude Code"
+    }
+  ]
+}

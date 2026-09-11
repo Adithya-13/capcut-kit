@@ -1,0 +1,87 @@
+#!/bin/sh
+set -e
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+KIT_HOME="${CAPCUT_KIT_HOME:-$HOME/.capcut-kit}"
+VENV="$KIT_HOME/venv"
+PYTHON="$VENV/bin/python"
+UV_LOCAL="$KIT_HOME/bin/uv"
+
+find_python() {
+    for candidate in python3.13 python3.12 python3.11 python3.10 python3; do
+        if command -v "$candidate" >/dev/null 2>&1 &&
+           "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+find_uv() {
+    if command -v uv >/dev/null 2>&1; then
+        command -v uv
+        return 0
+    fi
+    if [ -x "$UV_LOCAL" ]; then
+        echo "$UV_LOCAL"
+        return 0
+    fi
+    return 1
+}
+
+offer_uv_install() {
+    echo "capcut-kit needs Python 3.10 or newer, and this Mac does not have one." >&2
+    echo "" >&2
+    echo "It can install uv (a Python manager) into $KIT_HOME/bin," >&2
+    echo "which brings its own Python. Nothing outside $KIT_HOME is touched," >&2
+    echo "and deleting that folder removes everything." >&2
+    echo "" >&2
+    if [ ! -t 0 ]; then
+        echo "Run this once to set it up:" >&2
+        echo "  CAPCUT_KIT_AUTO_INSTALL=1 $0 $*" >&2
+        echo "Or install a Python yourself:  brew install python@3.12" >&2
+        return 1
+    fi
+    printf "Install uv now? [y/N] " >&2
+    read -r reply
+    case "$reply" in
+        [yY]*) return 0 ;;
+        *) echo "Cancelled. Install a Python yourself with: brew install python@3.12" >&2
+           return 1 ;;
+    esac
+}
+
+install_uv() {
+    mkdir -p "$KIT_HOME/bin"
+    curl -LsSf https://astral.sh/uv/install.sh |
+        env UV_INSTALL_DIR="$KIT_HOME/bin" UV_NO_MODIFY_PATH=1 sh >&2
+}
+
+needs_setup() {
+    [ -x "$PYTHON" ] || return 0
+    "$PYTHON" -c 'import capcut_kit' 2>/dev/null || return 0
+    return 1
+}
+
+if needs_setup; then
+    echo "capcut-kit: setting up its environment in $VENV" >&2
+    mkdir -p "$KIT_HOME"
+    if [ -x "$PYTHON" ]; then
+        :
+    elif UV=$(find_uv); then
+        "$UV" venv --python 3.12 "$VENV" >&2
+    elif BASE=$(find_python); then
+        "$BASE" -m venv "$VENV" >&2
+    elif [ "${CAPCUT_KIT_AUTO_INSTALL:-0}" = "1" ] || offer_uv_install "$@"; then
+        install_uv
+        "$UV_LOCAL" venv --python 3.12 "$VENV" >&2
+    else
+        exit 1
+    fi
+    "$PYTHON" -m pip install --quiet --upgrade pip >&2
+    "$PYTHON" -m pip install --quiet -e "$ROOT" >&2
+    echo "capcut-kit: ready" >&2
+fi
+
+exec "$PYTHON" -m capcut_kit.cli "$@"

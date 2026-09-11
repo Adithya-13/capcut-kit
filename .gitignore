@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+work/
+dist/
+build/
+*.egg-info/
+.DS_Store
+*.wav
+*.segments.json

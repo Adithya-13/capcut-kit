@@ -1,0 +1,11 @@
+{
+  "name": "capcut-kit",
+  "description": "Read, edit, and generate CapCut desktop projects from Claude Code. Inspect timelines, repair broken projects, build drafts from raw footage, and cut by silence, audio events, or beats.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Adithya Firmansyah Putra"
+  },
+  "license": "MIT",
+  "keywords": ["capcut", "video", "editing", "automation", "macos"],
+  "skills": "./skills/"
+}
