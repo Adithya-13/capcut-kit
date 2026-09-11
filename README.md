@@ -92,7 +92,7 @@ Deleting `~/.capcut-kit` removes everything it ever created.
 ### As a Claude Code plugin (recommended)
 
 ```
-/plugin marketplace add adithya-13/capcut-kit
+/plugin marketplace add Adithya-13/capcut-kit
 /plugin install capcut-kit@capcut-kit
 ```
 
@@ -112,7 +112,7 @@ anything that writes, and tell you the snapshot name so you can roll back.
 ### As a plain command line tool
 
 ```bash
-git clone https://github.com/adithya-13/capcut-kit
+git clone https://github.com/Adithya-13/capcut-kit
 cd capcut-kit
 ./bin/capcut projects
 ```
