@@ -6,6 +6,14 @@
     "name": "Adithya Firmansyah Putra"
   },
   "license": "MIT",
-  "keywords": ["capcut", "video", "editing", "automation", "macos"],
-  "skills": "./skills/"
+  "keywords": [
+    "capcut",
+    "video",
+    "editing",
+    "automation",
+    "macos"
+  ],
+  "skills": "./skills/",
+  "homepage": "https://github.com/adithya-13/capcut-kit",
+  "repository": "https://github.com/adithya-13/capcut-kit"
 }
