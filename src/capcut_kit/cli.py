@@ -137,7 +137,18 @@ def cmd_build(args: argparse.Namespace) -> int:
             print(f"error: {', '.join(ignored)} cannot be used with --layout sync, which "
                   f"places every clip at its real recording time.", file=sys.stderr)
             return 2
-        clips, notes = assemble.align(sources)
+        refine_options = {}
+        if args.refine_sync:
+            refine_options = {"search_s": args.search, "min_confidence": args.min_confidence}
+            print("matching camera audio to correct for clock drift...")
+        clips, notes, reports = assemble.align(
+            sources, refine=args.refine_sync, **refine_options)
+        for report in reports:
+            if report.accepted:
+                print(f"  {report.path.name}: moved {report.shift_s:+.2f}s "
+                      f"(confidence {report.confidence:.1f})")
+            else:
+                print(f"  {report.path.name}: {report.reason}")
         for note in notes:
             print(f"note: {note}")
         groups = assemble.group_by_device(sources)
@@ -240,6 +251,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--trim-start", type=float, default=0.0, help="seconds to cut off each head")
     p.add_argument("--trim-end", type=float, default=0.0, help="seconds to cut off each tail")
     p.add_argument("--max-clip", type=float, default=None, help="cap each clip at N seconds")
+    p.add_argument("--refine-sync", action="store_true",
+                   help="correct camera clock drift by matching the audio each camera "
+                        "heard, instead of trusting the recorded timestamps")
+    p.add_argument("--search", type=float, default=10.0,
+                   help="how many seconds either side of the clock estimate to search")
+    p.add_argument("--min-confidence", type=float, default=5.0,
+                   help="how strong an audio match must be before it is trusted")
     p.add_argument("--cut-silence", action="store_true",
                    help="drop stretches where nobody is talking, closing the gaps and "
                         "keeping every camera in sync")

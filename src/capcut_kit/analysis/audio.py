@@ -48,6 +48,21 @@ def wav_for(source: Path, sample_rate: int = VAD_SR) -> Path:
     return target
 
 
+def read_window(source: Path, start_s: float, duration_s: float,
+                sample_rate: int = VAD_SR):
+    require_ffmpeg()
+    import numpy as np
+
+    result = subprocess.run(
+        ["ffmpeg", "-v", "error", "-ss", f"{max(0.0, start_s):.3f}",
+         "-i", str(source), "-t", f"{max(0.0, duration_s):.3f}",
+         "-vn", "-ac", "1", "-ar", str(sample_rate),
+         "-f", "f32le", "-"],
+        check=True, capture_output=True,
+    )
+    return np.frombuffer(result.stdout, dtype=np.float32)
+
+
 def clear_cache() -> int:
     if not CACHE_ROOT.is_dir():
         return 0

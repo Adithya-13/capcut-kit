@@ -21,13 +21,13 @@ def source(name: str, offset_s: float, duration_s: float, device: str = "Cam A",
 
 
 def test_align_places_each_clip_at_its_recording_moment():
-    clips, notes = assemble.align([source("a", 0, 10), source("b", 60, 5)])
+    clips, notes, _ = assemble.align([source("a", 0, 10), source("b", 60, 5)])
     assert notes == []
     assert sorted(c.target_start_s for c in clips) == [0.0, 60.0]
 
 
 def test_align_puts_each_camera_on_its_own_track():
-    clips, _ = assemble.align([
+    clips, _, _ = assemble.align([
         source("a", 0, 100, device="Cam A"),
         source("b", 30, 10, device="Cam B"),
     ])
@@ -36,7 +36,7 @@ def test_align_puts_each_camera_on_its_own_track():
 
 
 def test_the_camera_with_most_footage_takes_the_main_track():
-    clips, _ = assemble.align([
+    clips, _, _ = assemble.align([
         source("short", 0, 5, device="Cam B"),
         source("long", 0, 500, device="Cam A"),
     ])
@@ -45,7 +45,7 @@ def test_the_camera_with_most_footage_takes_the_main_track():
 
 
 def test_overlapping_clips_from_one_camera_get_separate_tracks():
-    clips, notes = assemble.align([
+    clips, notes, _ = assemble.align([
         source("original", 0, 30),
         source("duplicate", 0, 30),
         source("later", 100, 10),

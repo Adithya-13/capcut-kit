@@ -148,6 +148,7 @@ both work. If a fragment matches more than one project, it lists them and stops.
 ```bash
 capcut build ~/Footage/shoot                                  everything end to end
 capcut build ~/Footage/shoot --layout sync                    cameras stacked and aligned
+capcut build ~/Footage/shoot --layout sync --refine-sync      alignment corrected by audio
 capcut build ~/Footage/shoot --layout sync --cut-silence      aligned, dead air removed
 capcut build ~/Footage/shoot --name "Saturday cut"
 capcut build ~/Footage/shoot --trim-start 2 --max-clip 10
@@ -161,6 +162,12 @@ at the moment it was actually recorded. A clip filmed twenty minutes in starts t
 in. Two cameras rolling at once end up stacked, so the same moment is one vertical line. This
 needs a recording time in every file, which phones and real cameras write automatically. If any
 file is missing one, it says so and tells you to use `sequence` instead.
+
+**`--refine-sync`** stops trusting the cameras' clocks. It matches the audio each camera heard
+against the main camera's audio and corrects the placement, which is what saves you when two
+devices disagree by a few seconds. Each clip reports how far it moved and how confident the
+match was. A clip with no clear match keeps its clock position and says so, rather than being
+moved on a guess. Needs the audio extras.
 
 **`--cut-silence`** listens for speech across every camera, keeps the stretches where someone
 is talking, and closes the gaps. Every track shifts by the same amount, so the alignment
@@ -250,7 +257,7 @@ before doing it.
 - [x] Build a project from a folder of footage
 - [x] Stack every camera at the moment it was recorded
 - [x] Cut the stretches where nobody is talking
-- [ ] Refine camera alignment by cross-correlating audio, for clocks that drift
+- [x] Refine camera alignment by cross-correlating audio, for clocks that drift
 - [ ] Detect audio events, with recipes for LEGO clicks, keyboards, cooking, impacts
 - [ ] Import subtitles into a real text track
 - [ ] Cut a montage to music beats
